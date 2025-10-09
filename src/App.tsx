@@ -129,7 +129,7 @@ export default function App() {
     >
       {/* Header */}
       <header className="fixed top-0 left-0 w-full z-50 flex items-center px-6 py-4">
-        <img src={logo} alt="Logo Aconcaia" className="h-4 md:h-6 object-contain" />
+        <img src={logo} alt="Logo Aconcaia" className="h-2 md:h-4 object-contain" />
       </header>
 
       <div className="w-full max-w-3xl">
