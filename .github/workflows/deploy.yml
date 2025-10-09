@@ -2,7 +2,8 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main ]   # dispara quando fizer push na main
+    branches: [ main ]     # dispara em push na main
+  workflow_dispatch: {}     # permite rodar manualmente
 
 permissions:
   contents: read
@@ -13,33 +14,26 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 1) pega o código
       - uses: actions/checkout@v4
 
-      # 2) escolhe Node e ativa cache
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      # 3) instala deps
       - run: npm ci
 
-      # 4) cria o .env com os segredos
       - name: Create .env
         run: |
           echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" > .env
           echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
           echo "VITE_N8N_WEBHOOK=${{ secrets.VITE_N8N_WEBHOOK }}" >> .env
 
-      # 5) build do Vite
       - run: npm run build
 
-      # 6) (SPA) fallback de 404 para index.html
       - name: SPA fallback
         run: cp dist/index.html dist/404.html
 
-      # 7) envia artefato para Pages
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
