@@ -13,16 +13,16 @@ const supabase = createClient(
 const N8N_URL_DEFAULT = import.meta.env.VITE_N8N_WEBHOOK!;
 
 // Webhooks por cliente (opcionais)
-const N8N_URL_RETAIL = import.meta.env.VITE_N8N_WEBHOOK_RETAIL as string | undefined;
-const N8N_URL_AUTO   = import.meta.env.VITE_N8N_WEBHOOK_AUTO   as string | undefined;
+const VITE_N8N_WEBHOOK = import.meta.env.VITE_N8N_WEBHOOK_RETAIL as string | undefined;
+const VITE_N8N_WEBHOOK_AUTO   = import.meta.env.VITE_N8N_WEBHOOK_AUTO   as string | undefined;
 // adicione outros clientes aqui se quiser…
 
 // ---------- CLIENTES DISPONÍVEIS ----------
 type ClientId = 'retail' | 'auto';
 
 const CLIENTS: { id: ClientId; label: string; webhook?: string }[] = [
-  { id: 'retail', label: 'Retail', webhook: N8N_URL_RETAIL },
-  { id: 'auto',   label: 'Auto',   webhook: N8N_URL_AUTO   },
+  { id: 'retail', label: 'Retail', webhook: VITE_N8N_WEBHOOK },
+  { id: 'auto',   label: 'Auto',   webhook: VITE_N8N_WEBHOOK_AUTO },
 ];
 
 // ---------- REGRAS DE ARQUIVO ----------
