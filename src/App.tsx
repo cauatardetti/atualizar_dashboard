@@ -152,7 +152,7 @@ export default function App() {
       </header>
 
       {/* Caixa flutuante de seleção de cliente */}
-      <div className="fixed right-4 bottom-4 z-50">
+      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
         <div className="rounded-xl border border-white/10 bg-[color:var(--aca-card,#121316)] shadow-lg px-4 py-3 min-w-[220px]">
           <div className="text-xs text-[color:var(--aca-muted,#9BA0A6)] mb-1">Cliente</div>
           <select
