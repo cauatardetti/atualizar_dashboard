@@ -116,20 +116,21 @@ export default function App() {
 
       setStatus('notifying')
 
-      // envia para o webhook "resolvido" + inclui client no body
+          // envia como multipart/form-data (sem headers)
+      const fd = new FormData();
+      fd.append('client', client);
+      fd.append('url', fileUrl);
+      fd.append('filename', file.name);
+      fd.append('mimetype', file.type || 'application/octet-stream');
+      fd.append('size', String(file.size));
+      fd.append('source', 'supabase');
+
       const r = await fetch(resolvedWebhook, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client,                    // <- importante para o n8n (caso use um único webhook)
-          url: fileUrl,
-          filename: file.name,
-          mimetype: file.type,
-          size: file.size,
-          source: 'supabase'
-        })
-      })
-      if (!r.ok) throw new Error(`Falha ao notificar n8n (${r.status})`)
+        body: fd,                     // <-- sem headers
+        // credentials: 'omit'        // deixe omit a não ser que precise de cookies
+      });
+      if (!r.ok) throw new Error(`Falha ao notificar n8n (${r.status})`);
 
       setProgress(100)
       setStatus('success')
