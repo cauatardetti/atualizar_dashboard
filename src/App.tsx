@@ -63,6 +63,11 @@ export default function App() {
     return (found?.webhook || N8N_URL_DEFAULT) ?? '(Webhook não configurado)'
   }, [client])
 
+  // Valida formato da URL para evitar tentativas com destino inválido
+  const isWebhookValid = useMemo(() => {
+    try { new URL(resolvedWebhook); return true } catch { return false }
+  }, [resolvedWebhook])
+
   const onBrowse = () => inputRef.current?.click()
 
   const validateFile = (f: File) => {
@@ -87,6 +92,7 @@ export default function App() {
 
   const onUpload = async () => {
     if (!file) return
+    if (!isWebhookValid) { setStatus('error'); setMessage('Destino do webhook inválido. Verifique a URL.'); return }
     setStatus('uploading'); setProgress(8); setMessage('')
 
     try {
@@ -138,7 +144,13 @@ export default function App() {
       setFile(null)
     } catch (e:any) {
       setStatus('error')
-      setMessage(e?.message || 'Falha no upload')
+      const raw = String(e?.message || e || '')
+      const dnsHints = ['ERR_NAME_NOT_RESOLVED', 'getaddrinfo', 'ENOTFOUND']
+      const isDns = dnsHints.some(h => raw.includes(h)) || raw.includes('Failed to fetch')
+      const msg = isDns
+        ? 'Falha de rede ao acessar o webhook (DNS/host). Confira se o domínio está correto e acessível.'
+        : (raw || 'Falha no upload')
+      setMessage(msg)
     }
   }
 
@@ -165,8 +177,11 @@ export default function App() {
               <option key={c.id} value={c.id}>{c.label}</option>
             ))}
           </select>
-          <div className="mt-2 text-[10px] text-[color:var(--aca-muted,#9BA0A6)] break-all">
-            destino: <code>{resolvedWebhook}</code>
+          <div className="mt-2 text-[10px] break-all">
+            <span className="text-[color:var(--aca-muted,#9BA0A6)]">destino:</span> <code>{resolvedWebhook}</code>
+            {!isWebhookValid && (
+              <span className="ml-2 text-red-300">(URL inválida)</span>
+            )}
           </div>
         </div>
       </div>
@@ -180,7 +195,7 @@ export default function App() {
               <p className="text-sm md:text-base mt-2 text-[color:var(--aca-muted,#9BA0A6)]">
                 Envie um <span className="font-medium">.csv</span> ou <span className="font-medium">.xlsx</span>.
               </p>
-              <p className="text-[11px] mt-2 opacity-70">Destino: <code>{resolvedWebhook}</code></p>
+              <p className="text-[11px] mt-2 opacity-70">Destino: <code>{resolvedWebhook}</code> {!isWebhookValid && <span className="text-red-300 ml-1">(URL inválida)</span>}</p>
             </div>
 
             {/* Dropzone */}
@@ -232,10 +247,10 @@ export default function App() {
                     onClick={onUpload}
                     className="inline-flex items-center gap-2 rounded-lg px-4 py-2 font-medium text-white disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                     style={{ background: "var(--aca-primary,#7C3AED)" }}
-                    disabled={status === "uploading"}
-                  >
-                    {status === "uploading" ? (<><Loader2 className="w-4 h-4 animate-spin" />Enviando...</>) : (<>Enviar</>)}
-                  </button>
+                disabled={status === "uploading" || !isWebhookValid}
+              >
+                {status === "uploading" ? (<><Loader2 className="w-4 h-4 animate-spin" />Enviando...</>) : (<>Enviar</>)}
+              </button>
                 </div>
                 {status === "uploading" && (
                   <div className="mt-3 w-full h-2 rounded-full bg-white/10 overflow-hidden">
