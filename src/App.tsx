@@ -45,6 +45,23 @@ const prettyBytes = (bytes: number) => {
   return `${v.toFixed(1)} ${units[i]}`
 }
 
+// Normaliza domínios comuns digitados com erro
+const normalizeWebhook = (urlStr: string) => {
+  try {
+    const u = new URL(urlStr)
+    const map: Record<string, string> = {
+      'work-flow.aconcaia.com': 'workflow.aconcaia.com',
+      'workf1ow.aconcaia.com': 'workflow.aconcaia.com', // 1 no lugar de l
+      'workfiow.aconcaia.com': 'workflow.aconcaia.com', // i no lugar de l
+      'workfIow.aconcaia.com': 'workflow.aconcaia.com', // I maiúsculo no lugar de l
+      'workfl0w.aconcaia.com': 'workflow.aconcaia.com', // 0 no lugar de o
+    }
+    const lh = u.host.toLowerCase()
+    if (map[lh]) u.host = map[lh]
+    return u.toString()
+  } catch { return urlStr }
+}
+
 export default function App() {
   const inputRef = useRef<HTMLInputElement|null>(null)
 
@@ -61,12 +78,15 @@ export default function App() {
   const resolvedWebhook = useMemo(() => {
     const found = CLIENTS.find(c => c.id === client)
     return (found?.webhook || N8N_URL_DEFAULT) ?? '(Webhook não configurado)'
-  }, [client])
+  }, [client]
+
+  const finalWebhook = useMemo(() => normalizeWebhook(resolvedWebhook), [resolvedWebhook])
+)
 
   // Valida formato da URL para evitar tentativas com destino inválido
   const isWebhookValid = useMemo(() => {
-    try { new URL(resolvedWebhook); return true } catch { return false }
-  }, [resolvedWebhook])
+    try { new URL(finalWebhook); return true } catch { return false }
+  }, [finalWebhook])
 
   const onBrowse = () => inputRef.current?.click()
 
@@ -131,7 +151,7 @@ export default function App() {
       fd.append('size', String(file.size));
       fd.append('source', 'supabase');
 
-      const r = await fetch(resolvedWebhook, {
+      const r = await fetch(finalWebhook, {
         method: 'POST',
         body: fd,                     // <-- sem headers
         // credentials: 'omit'        // deixe omit a não ser que precise de cookies
@@ -178,7 +198,7 @@ export default function App() {
             ))}
           </select>
           <div className="mt-2 text-[10px] break-all">
-            <span className="text-[color:var(--aca-muted,#9BA0A6)]">destino:</span> <code>{resolvedWebhook}</code>
+            <span className="text-[color:var(--aca-muted,#9BA0A6)]">destino:</span> <code>{finalWebhook}</code>
             {!isWebhookValid && (
               <span className="ml-2 text-red-300">(URL inválida)</span>
             )}
@@ -195,7 +215,7 @@ export default function App() {
               <p className="text-sm md:text-base mt-2 text-[color:var(--aca-muted,#9BA0A6)]">
                 Envie um <span className="font-medium">.csv</span> ou <span className="font-medium">.xlsx</span>.
               </p>
-              <p className="text-[11px] mt-2 opacity-70">Destino: <code>{resolvedWebhook}</code> {!isWebhookValid && <span className="text-red-300 ml-1">(URL inválida)</span>}</p>
+              <p className="text-[11px] mt-2 opacity-70">destino: <code>{finalWebhook}</code> {!isWebhookValid && <span className="text-red-300 ml-1">(URL inválida)</span>}</p>
             </div>
 
             {/* Dropzone */}
