@@ -23,6 +23,14 @@ jobs:
 
       - run: npm ci
 
+      - name: Set BASE_PATH for GitHub Pages
+        run: |
+          if [ -n "${{ secrets.BASE_PATH }}" ]; then
+            echo "BASE_PATH=${{ secrets.BASE_PATH }}" >> $GITHUB_ENV
+          else
+            echo "BASE_PATH=/${GITHUB_REPOSITORY#*/}/" >> $GITHUB_ENV
+          fi
+
       - name: Create .env
         run: |
           echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" > .env

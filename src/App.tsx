@@ -10,10 +10,10 @@ const supabase = createClient(
 )
 
 // Webhook padrão (fallback)
-const N8N_URL_DEFAULT = import.meta.env.VITE_N8N_WEBHOOK!;
+const N8N_URL_DEFAULT = import.meta.env.VITE_N8N_WEBHOOK! as string;
 
 // Webhooks por cliente (opcionais)
-const VITE_N8N_WEBHOOK = import.meta.env.VITE_N8N_WEBHOOK_RETAIL as string | undefined;
+const VITE_N8N_WEBHOOK_RETAIL = import.meta.env.VITE_N8N_WEBHOOK_RETAIL as string | undefined;
 const VITE_N8N_WEBHOOK_AUTO   = import.meta.env.VITE_N8N_WEBHOOK_AUTO   as string | undefined;
 // adicione outros clientes aqui se quiser…
 
@@ -21,7 +21,7 @@ const VITE_N8N_WEBHOOK_AUTO   = import.meta.env.VITE_N8N_WEBHOOK_AUTO   as strin
 type ClientId = 'retail' | 'auto';
 
 const CLIENTS: { id: ClientId; label: string; webhook?: string }[] = [
-  { id: 'retail', label: 'Retail', webhook: VITE_N8N_WEBHOOK },
+  { id: 'retail', label: 'Retail', webhook: VITE_N8N_WEBHOOK_RETAIL },
   { id: 'auto',   label: 'Auto',   webhook: VITE_N8N_WEBHOOK_AUTO },
 ];
 
@@ -57,7 +57,7 @@ const normalizeWebhook = (urlStr: string) => {
       'workfl0w.aconcaia.com': 'workflow.aconcaia.com', // 0 no lugar de o
     }
     const lh = u.host.toLowerCase()
-    if (map[lh]) u.host = map[lh]
+    if (map[lh]) u.hostname = map[lh] // usar hostname para não perder porta
     return u.toString()
   } catch { return urlStr }
 }
@@ -78,10 +78,9 @@ export default function App() {
   const resolvedWebhook = useMemo(() => {
     const found = CLIENTS.find(c => c.id === client)
     return (found?.webhook || N8N_URL_DEFAULT) ?? '(Webhook não configurado)'
-  }, [client]
+  }, [client]) // <-- FECHAMENTO CORRIGIDO
 
   const finalWebhook = useMemo(() => normalizeWebhook(resolvedWebhook), [resolvedWebhook])
-)
 
   // Valida formato da URL para evitar tentativas com destino inválido
   const isWebhookValid = useMemo(() => {
@@ -91,8 +90,15 @@ export default function App() {
   const onBrowse = () => inputRef.current?.click()
 
   const validateFile = (f: File) => {
-    if (f.size > MAX_MB*1024*1024) { setStatus('error'); setMessage(`Tamanho máximo: ${MAX_MB} MB`); return false }
-    const ok = ACCEPTED.some(a => f.type===a || f.name.toLowerCase().endsWith(a as string))
+    if (f.size > MAX_MB*1024*1024) {
+      setStatus('error'); setMessage(`Tamanho máximo: ${MAX_MB} MB`); return false
+    }
+    // aceita por MIME OU extensão
+    const ok = ACCEPTED.some(a => {
+      const s = String(a)
+      return (s.startsWith('.') && f.name.toLowerCase().endsWith(s))
+          || (!s.startsWith('.') && f.type === s)
+    })
     if (!ok) { setStatus('error'); setMessage('Tipo inválido. Use .xlsx ou .csv'); return false }
     return true
   }
@@ -125,7 +131,7 @@ export default function App() {
 
       const { error } = await supabase.storage
         .from('uploads')
-        .upload(key, file, { contentType: file.type, upsert: false })
+        .upload(key, file, { contentType: file.type || 'application/octet-stream', upsert: false })
 
       clearInterval(tick)
       if (error) {
@@ -142,7 +148,7 @@ export default function App() {
 
       setStatus('notifying')
 
-          // envia como multipart/form-data (sem headers)
+      // envia como multipart/form-data (sem headers)
       const fd = new FormData();
       fd.append('client', client);
       fd.append('url', fileUrl);
@@ -153,8 +159,7 @@ export default function App() {
 
       const r = await fetch(finalWebhook, {
         method: 'POST',
-        body: fd,                     // <-- sem headers
-        // credentials: 'omit'        // deixe omit a não ser que precise de cookies
+        body: fd,
       });
       if (!r.ok) throw new Error(`Falha ao notificar n8n (${r.status})`);
 
@@ -267,10 +272,10 @@ export default function App() {
                     onClick={onUpload}
                     className="inline-flex items-center gap-2 rounded-lg px-4 py-2 font-medium text-white disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                     style={{ background: "var(--aca-primary,#7C3AED)" }}
-                disabled={status === "uploading" || !isWebhookValid}
-              >
-                {status === "uploading" ? (<><Loader2 className="w-4 h-4 animate-spin" />Enviando...</>) : (<>Enviar</>)}
-              </button>
+                    disabled={status === "uploading" || !isWebhookValid}
+                  >
+                    {status === "uploading" ? (<><Loader2 className="w-4 h-4 animate-spin" />Enviando...</>) : (<>Enviar</>)}
+                  </button>
                 </div>
                 {status === "uploading" && (
                   <div className="mt-3 w-full h-2 rounded-full bg-white/10 overflow-hidden">
