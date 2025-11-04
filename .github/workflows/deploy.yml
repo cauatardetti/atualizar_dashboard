@@ -25,8 +25,8 @@ jobs:
 
       - name: Set BASE_PATH for GitHub Pages
         run: |
-          if [ -n "ac_atualizar_dashboard" ]; then
-            echo "BASE_PATH=/ac_atualizar_dashboard/" >> $GITHUB_ENV
+          if [ -n "atualizar_dashboard" ]; then
+            echo "BASE_PATH=/atualizar_dashboard/" >> $GITHUB_ENV
           else
             echo "BASE_PATH=/${GITHUB_REPOSITORY#*/}/" >> $GITHUB_ENV
           fi

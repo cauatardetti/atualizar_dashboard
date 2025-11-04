@@ -6,5 +6,5 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/ac_atualizar_dashboard/',
+  base: '/atualizar_dashboard/',
 })
