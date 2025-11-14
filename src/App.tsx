@@ -15,14 +15,16 @@ const N8N_URL_DEFAULT = import.meta.env.VITE_N8N_WEBHOOK! as string;
 // Webhooks por cliente (opcionais)
 const VITE_N8N_WEBHOOK_RETAIL = import.meta.env.VITE_N8N_WEBHOOK_RETAIL as string | undefined;
 const VITE_N8N_WEBHOOK_AUTO   = import.meta.env.VITE_N8N_WEBHOOK_AUTO   as string | undefined;
+const VITE_N8N_WEBHOOK_AUTO_MOVE = import.meta.env.VITE_N8N_WEBHOOK_AUTO_MOVE as string | undefined;
 // adicione outros clientes aqui se quiser…
 
 // ---------- CLIENTES DISPONÍVEIS ----------
-type ClientId = 'retail' | 'auto';
+type ClientId = 'retail' | 'auto' | 'auto-move';
 
 const CLIENTS: { id: ClientId; label: string; webhook?: string }[] = [
   { id: 'retail', label: 'Retail', webhook: VITE_N8N_WEBHOOK_RETAIL },
   { id: 'auto',   label: 'Auto',   webhook: VITE_N8N_WEBHOOK_AUTO },
+  { id: 'auto-move', label: 'Auto Move', webhook: VITE_N8N_WEBHOOK_AUTO_MOVE },
 ];
 
 // ---------- REGRAS DE ARQUIVO ----------
@@ -317,3 +319,6 @@ export default function App() {
     </div>
   );
 }
+
+
+
