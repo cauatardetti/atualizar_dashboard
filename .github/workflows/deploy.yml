@@ -38,6 +38,7 @@ jobs:
           echo "VITE_N8N_WEBHOOK=${{ secrets.VITE_N8N_WEBHOOK }}" >> .env
           echo "VITE_N8N_WEBHOOK_RETAIL=${{ secrets.VITE_N8N_WEBHOOK_RETAIL != '' && secrets.VITE_N8N_WEBHOOK_RETAIL || secrets.VITE_N8N_WEBHOOK }}" >> .env
           echo "VITE_N8N_WEBHOOK_AUTO=${{ secrets.VITE_N8N_WEBHOOK_AUTO }}" >> .env
+          echo "VITE_N8N_WEBHOOK_AUTO_MOVE=${{ secrets.VITE_N8N_WEBHOOK_AUTO_MOVE }}" >> .env
 
       - run: npm run build
 
