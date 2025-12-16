@@ -1,190 +1,190 @@
-import { useRef, useState, useMemo } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { useMemo, useRef, useState } from "react";
 import { UploadCloud, FileSpreadsheet, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import logo from "./assets/image.png";
 
-// ---------- ENV ----------
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL!,
-  import.meta.env.VITE_SUPABASE_ANON_KEY!
-)
-
-// Webhook padrão (fallback)
+// ---------- ENV / WEBHOOKS ----------
 const N8N_URL_DEFAULT = import.meta.env.VITE_N8N_WEBHOOK! as string;
 
 // Webhooks por cliente (opcionais)
 const VITE_N8N_WEBHOOK_RETAIL = import.meta.env.VITE_N8N_WEBHOOK_RETAIL as string | undefined;
-const VITE_N8N_WEBHOOK_AUTO   = import.meta.env.VITE_N8N_WEBHOOK_AUTO   as string | undefined;
+const VITE_N8N_WEBHOOK_AUTO = import.meta.env.VITE_N8N_WEBHOOK_AUTO as string | undefined;
 const VITE_N8N_WEBHOOK_AUTO_MOVE = import.meta.env.VITE_N8N_WEBHOOK_AUTO_MOVE as string | undefined;
-// adicione outros clientes aqui se quiser…
 
 // ---------- CLIENTES DISPONÍVEIS ----------
-type ClientId = 'retail' | 'auto' | 'auto-move';
+type ClientId = "retail" | "auto" | "auto-move";
 
 const CLIENTS: { id: ClientId; label: string; webhook?: string }[] = [
-  { id: 'retail', label: 'Retail', webhook: VITE_N8N_WEBHOOK_RETAIL },
-  { id: 'auto',   label: 'Auto',   webhook: VITE_N8N_WEBHOOK_AUTO },
-  { id: 'auto-move', label: 'Auto Move', webhook: VITE_N8N_WEBHOOK_AUTO_MOVE },
+  { id: "retail", label: "Retail", webhook: VITE_N8N_WEBHOOK_RETAIL },
+  { id: "auto", label: "Auto", webhook: VITE_N8N_WEBHOOK_AUTO },
+  { id: "auto-move", label: "Auto Move", webhook: VITE_N8N_WEBHOOK_AUTO_MOVE },
 ];
 
 // ---------- REGRAS DE ARQUIVO ----------
 const ACCEPTED = [
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-excel',
-  'text/csv',
-  '.xlsx',
-  '.csv',
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "text/csv",
+  ".xlsx",
+  ".csv",
 ] as const;
 
 const MAX_MB = 50;
-const acceptStr = '.csv,.xlsx';
-const acceptListForFooter = '.csv, .xlsx';
+const acceptStr = ".csv,.xlsx";
+const acceptListForFooter = ".csv, .xlsx";
 const maxSizeMB = MAX_MB;
 
 const prettyBytes = (bytes: number) => {
-  const units = ['B','KB','MB','GB']; let i=0, v=bytes
-  while (v>=1024 && i<units.length-1){ v/=1024; i++ }
-  return `${v.toFixed(1)} ${units[i]}`
-}
+  const units = ["B", "KB", "MB", "GB"];
+  let i = 0;
+  let v = bytes;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v.toFixed(1)} ${units[i]}`;
+};
 
 // Normaliza domínios comuns digitados com erro
 const normalizeWebhook = (urlStr: string) => {
   try {
-    const u = new URL(urlStr)
+    const u = new URL(urlStr);
     const map: Record<string, string> = {
-      'work-flow.aconcaia.com': 'workflow.aconcaia.com',
-      'workf1ow.aconcaia.com': 'workflow.aconcaia.com', // 1 no lugar de l
-      'workfiow.aconcaia.com': 'workflow.aconcaia.com', // i no lugar de l
-      'workfIow.aconcaia.com': 'workflow.aconcaia.com', // I maiúsculo no lugar de l
-      'workfl0w.aconcaia.com': 'workflow.aconcaia.com', // 0 no lugar de o
-    }
-    const lh = u.host.toLowerCase()
-    if (map[lh]) u.hostname = map[lh] // usar hostname para não perder porta
-    return u.toString()
-  } catch { return urlStr }
-}
+      "work-flow.aconcaia.com": "workflow.aconcaia.com",
+      "workf1ow.aconcaia.com": "workflow.aconcaia.com", // 1 no lugar de l
+      "workfiow.aconcaia.com": "workflow.aconcaia.com", // i no lugar de l
+      "workfIow.aconcaia.com": "workflow.aconcaia.com", // I maiúsculo no lugar de l
+      "workfl0w.aconcaia.com": "workflow.aconcaia.com", // 0 no lugar de o
+    };
+    const lh = u.host.toLowerCase();
+    if (map[lh]) u.hostname = map[lh]; // usar hostname para não perder porta
+    return u.toString();
+  } catch {
+    return urlStr;
+  }
+};
 
 export default function App() {
-  const inputRef = useRef<HTMLInputElement|null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const [file, setFile] = useState<File|null>(null)
-  const [status, setStatus] = useState<'idle'|'uploading'|'notifying'|'success'|'error'>('idle')
-  const [progress, setProgress] = useState(0)
-  const [message, setMessage] = useState('')
-  const [dragOver, setDragOver] = useState(false)
+  const [file, setFile] = useState<File | null>(null);
+  const [status, setStatus] = useState<"idle" | "uploading" | "notifying" | "success" | "error">("idle");
+  const [progress, setProgress] = useState(0);
+  const [message, setMessage] = useState("");
+  const [dragOver, setDragOver] = useState(false);
 
   // novo: cliente selecionado (default: retail)
-  const [client, setClient] = useState<ClientId>('retail')
+  const [client, setClient] = useState<ClientId>("retail");
 
   // Resolve o webhook para o cliente escolhido; se não houver específico, usa o padrão
   const resolvedWebhook = useMemo(() => {
-    const found = CLIENTS.find(c => c.id === client)
-    return (found?.webhook || N8N_URL_DEFAULT) ?? '(Webhook não configurado)'
-  }, [client]) // <-- FECHAMENTO CORRIGIDO
+    const found = CLIENTS.find((c) => c.id === client);
+    return (found?.webhook || N8N_URL_DEFAULT) ?? "(Webhook não configurado)";
+  }, [client]);
 
-  const finalWebhook = useMemo(() => normalizeWebhook(resolvedWebhook), [resolvedWebhook])
+  const finalWebhook = useMemo(() => normalizeWebhook(resolvedWebhook), [resolvedWebhook]);
 
   // Valida formato da URL para evitar tentativas com destino inválido
   const isWebhookValid = useMemo(() => {
-    try { new URL(finalWebhook); return true } catch { return false }
-  }, [finalWebhook])
+    try {
+      new URL(finalWebhook);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [finalWebhook]);
 
-  const onBrowse = () => inputRef.current?.click()
+  const onBrowse = () => inputRef.current?.click();
 
   const validateFile = (f: File) => {
-    if (f.size > MAX_MB*1024*1024) {
-      setStatus('error'); setMessage(`Tamanho máximo: ${MAX_MB} MB`); return false
+    if (f.size > MAX_MB * 1024 * 1024) {
+      setStatus("error");
+      setMessage(`Tamanho máximo: ${MAX_MB} MB`);
+      return false;
     }
     // aceita por MIME OU extensão
-    const ok = ACCEPTED.some(a => {
-      const s = String(a)
-      return (s.startsWith('.') && f.name.toLowerCase().endsWith(s))
-          || (!s.startsWith('.') && f.type === s)
-    })
-    if (!ok) { setStatus('error'); setMessage('Tipo inválido. Use .xlsx ou .csv'); return false }
-    return true
-  }
+    const ok = ACCEPTED.some((a) => {
+      const s = String(a);
+      return (s.startsWith(".") && f.name.toLowerCase().endsWith(s)) || (!s.startsWith(".") && f.type === s);
+    });
+    if (!ok) {
+      setStatus("error");
+      setMessage("Tipo inválido. Use .xlsx ou .csv");
+      return false;
+    }
+    return true;
+  };
 
-  const handleFiles = (files: FileList|null) => {
-    if(!files?.length) return
-    const f = files[0]
-    if (!validateFile(f)) return
-    setFile(f); setStatus('idle'); setMessage('')
-  }
+  const handleFiles = (files: FileList | null) => {
+    if (!files?.length) return;
+    const f = files[0];
+    if (!validateFile(f)) return;
+    setFile(f);
+    setStatus("idle");
+    setMessage("");
+  };
 
   const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    setDragOver(false)
-    handleFiles(e.dataTransfer.files)
-  }
+    e.preventDefault();
+    setDragOver(false);
+    handleFiles(e.dataTransfer.files);
+  };
 
   const onUpload = async () => {
-    if (!file) return
-    if (!isWebhookValid) { setStatus('error'); setMessage('Destino do webhook inválido. Verifique a URL.'); return }
-    setStatus('uploading'); setProgress(8); setMessage('')
+    if (!file) return;
+    if (!isWebhookValid) {
+      setStatus("error");
+      setMessage("Destino do webhook inválido. Verifique a URL.");
+      return;
+    }
+    setStatus("uploading");
+    setProgress(8);
+    setMessage("");
 
     try {
-      // pasta por cliente -> public/<client>/
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'bin'
-      const key = `public/${client}/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`
-
       // progresso "fake" enquanto o fetch roda
-      const tick = setInterval(() => setProgress(p => (p < 78 ? p + 2 : p)), 200)
+      const tick = setInterval(() => setProgress((p) => (p < 78 ? p + 2 : p)), 200);
 
-      const { error } = await supabase.storage
-        .from('uploads')
-        .upload(key, file, { contentType: file.type || 'application/octet-stream', upsert: false })
+      setStatus("notifying");
 
-      clearInterval(tick)
-      if (error) {
-        const msg = error?.message?.includes('duplicate')
-          ? 'Já existe um arquivo com esse nome. Tente novamente.'
-          : error.message || 'Falha ao enviar para o storage'
-        throw new Error(msg)
-      }
-
-      setProgress(85)
-
-      const { data } = supabase.storage.from('uploads').getPublicUrl(key)
-      const fileUrl = data.publicUrl
-
-      setStatus('notifying')
-
-      // envia como multipart/form-data (sem headers)
+      // envia arquivo diretamente para o n8n como multipart/form-data
       const fd = new FormData();
-      fd.append('client', client);
-      fd.append('url', fileUrl);
-      fd.append('filename', file.name);
-      fd.append('mimetype', file.type || 'application/octet-stream');
-      fd.append('size', String(file.size));
-      fd.append('source', 'supabase');
+      fd.append("client", client);
+      fd.append("file", file);
+      fd.append("filename", file.name);
+      fd.append("mimetype", file.type || "application/octet-stream");
+      fd.append("size", String(file.size));
+      fd.append("source", "uploader-frontend");
 
       const r = await fetch(finalWebhook, {
-        method: 'POST',
+        method: "POST",
         body: fd,
       });
       if (!r.ok) throw new Error(`Falha ao notificar n8n (${r.status})`);
 
-      setProgress(100)
-      setStatus('success')
-      setMessage(`✅ Enviado e notificado para ${client.toUpperCase()}!`)
-      setFile(null)
-    } catch (e:any) {
-      setStatus('error')
-      const raw = String(e?.message || e || '')
-      const dnsHints = ['ERR_NAME_NOT_RESOLVED', 'getaddrinfo', 'ENOTFOUND']
-      const isDns = dnsHints.some(h => raw.includes(h)) || raw.includes('Failed to fetch')
+      clearInterval(tick);
+      setProgress(100);
+      setStatus("success");
+      setMessage(`OK. Enviado e notificado para ${client.toUpperCase()}!`);
+      setFile(null);
+    } catch (e: any) {
+      setStatus("error");
+      const raw = String(e?.message || e || "");
+      const dnsHints = ["ERR_NAME_NOT_RESOLVED", "getaddrinfo", "ENOTFOUND"];
+      const isDns = dnsHints.some((h) => raw.includes(h)) || raw.includes("Failed to fetch");
       const msg = isDns
-        ? 'Falha de rede ao acessar o webhook (DNS/host). Confira se o domínio está correto e acessível.'
-        : (raw || 'Falha no upload')
-      setMessage(msg)
+        ? "Falha de rede ao acessar o webhook (DNS/host). Confira se o domínio está correto e acessível."
+        : raw || "Falha no upload";
+      setMessage(msg);
     }
-  }
+  };
 
   return (
     <div
       className="min-h-screen w-full flex items-start justify-center p-6 pt-24"
-      style={{ background: "linear-gradient(135deg, var(--aca-bg,#0C0C0E) 0%, #0F0F13 100%)", color: "var(--aca-text,#EDEDF2)" }}
+      style={{
+        background: "linear-gradient(135deg, var(--aca-bg,#0C0C0E) 0%, #0F0F13 100%)",
+        color: "var(--aca-text,#EDEDF2)",
+      }}
     >
       {/* Header */}
       <header className="fixed top-0 left-0 w-full z-50 flex items-center px-6 py-4">
@@ -200,34 +200,42 @@ export default function App() {
             onChange={(e) => setClient(e.target.value as ClientId)}
             className="w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2 text-sm outline-none"
           >
-            {CLIENTS.map(c => (
-              <option key={c.id} value={c.id}>{c.label}</option>
+            {CLIENTS.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
             ))}
           </select>
           <div className="mt-2 text-[10px] break-all">
             <span className="text-[color:var(--aca-muted,#9BA0A6)]">destino:</span> <code>{finalWebhook}</code>
-            {!isWebhookValid && (
-              <span className="ml-2 text-red-300">(URL inválida)</span>
-            )}
+            {!isWebhookValid && <span className="ml-2 text-red-300">(URL inválida)</span>}
           </div>
         </div>
       </div>
 
       <div className="w-full max-w-3xl">
-        <div className="rounded-2xl md:rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,0.25)] border border-white/10"
-             style={{ background: "var(--aca-card,#121316)" }}>
+        <div
+          className="rounded-2xl md:rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,0.25)] border border-white/10"
+          style={{ background: "var(--aca-card,#121316)" }}
+        >
           <div className="p-6 md:p-10">
             <div className="mb-6 md:mb-8">
               <h1 className="text-2xl md:text-4xl font-semibold tracking-tight">Atualizar Dados do Dashboard</h1>
               <p className="text-sm md:text-base mt-2 text-[color:var(--aca-muted,#9BA0A6)]">
                 Envie um <span className="font-medium">.csv</span> ou <span className="font-medium">.xlsx</span>.
               </p>
-              <p className="text-[11px] mt-2 opacity-70">destino: <code>{finalWebhook}</code> {!isWebhookValid && <span className="text-red-300 ml-1">(URL inválida)</span>}</p>
+              <p className="text-[11px] mt-2 opacity-70">
+                destino: <code>{finalWebhook}</code>{" "}
+                {!isWebhookValid && <span className="text-red-300 ml-1">(URL inválida)</span>}
+              </p>
             </div>
 
             {/* Dropzone */}
             <div
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
               onDragLeave={() => setDragOver(false)}
               onDrop={onDrop}
               className={[
@@ -237,8 +245,12 @@ export default function App() {
                 dragOver ? "border-[color:var(--aca-primary,#7C3AED)] bg-white/5" : "border-white/15 hover:border-white/25",
               ].join(" ")}
             >
-              <div className="w-14 h-14 rounded-full flex items-center justify-center shadow-inner"
-                   style={{ background: "linear-gradient(180deg, var(--aca-primary,#7C3AED), var(--aca-primary-2,#A78BFA))" }}>
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center shadow-inner"
+                style={{
+                  background: "linear-gradient(180deg, var(--aca-primary,#7C3AED), var(--aca-primary-2,#A78BFA))",
+                }}
+              >
                 <UploadCloud className="w-7 h-7 text-white" />
               </div>
               <p className="text-base md:text-lg">Arraste e solte o arquivo aqui</p>
@@ -276,15 +288,25 @@ export default function App() {
                     style={{ background: "var(--aca-primary,#7C3AED)" }}
                     disabled={status === "uploading" || !isWebhookValid}
                   >
-                    {status === "uploading" ? (<><Loader2 className="w-4 h-4 animate-spin" />Enviando...</>) : (<>Enviar</>)}
+                    {status === "uploading" ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>Enviar</>
+                    )}
                   </button>
                 </div>
                 {status === "uploading" && (
                   <div className="mt-3 w-full h-2 rounded-full bg-white/10 overflow-hidden">
-                    <div className="h-full" style={{
-                      width: `${progress}%`,
-                      background: "linear-gradient(90deg, var(--aca-primary,#7C3AED), var(--aca-primary-2,#A78BFA))",
-                    }} />
+                    <div
+                      className="h-full"
+                      style={{
+                        width: `${progress}%`,
+                        background: "linear-gradient(90deg, var(--aca-primary,#7C3AED), var(--aca-primary-2,#A78BFA))",
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -306,19 +328,20 @@ export default function App() {
 
             {/* Rodapé */}
             <div className="mt-6 text-xs text-[color:var(--aca-muted,#9BA0A6)]">
-              <p>Formatos aceitos: {acceptListForFooter} • Limite {maxSizeMB} MB</p>
-              <p className="mt-1">Dica: mantenha os nomes das colunas estáveis para facilitar o ETL no n8n.</p>
+              <p>
+                Formatos aceitos: {acceptListForFooter} · Limite {maxSizeMB} MB
+              </p>
+              <p className="mt-1">
+                Dica: mantenha os nomes das colunas estáveis para facilitar o ETL no n8n.
+              </p>
             </div>
           </div>
         </div>
 
         <div className="text-center text-[11px] mt-4 text-[color:var(--aca-muted,#9BA0A6)]">
-          <span>Interface de Aconcaia · Upload → Supabase → n8n → SQL → Dashboard</span>
+          <span>Interface de Aconcaia · Upload → n8n → SQL → Dashboard</span>
         </div>
       </div>
     </div>
   );
 }
-
-
-
